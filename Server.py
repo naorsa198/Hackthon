@@ -20,7 +20,10 @@ def run(clientSocket,index):
             #send the team name to server
             clientSocket.send(qes.encode())
             #recv answer from client and put it into dictionary [teamname] = answer
-            myans = clientSocket.recv(1024).decode()
+#   TODO HERE HABE BUG ITS NOT RECV
+            myans = clientSocket.recv(1024)
+            print("falling why  maybe because i try two clients from same pc ? same ip same port????")
+            myans = myans.decode()
             clientAns[index] = myans
             global answer
             answer = True
@@ -67,6 +70,20 @@ result = 2
 lock = True
 
 
+def count10():
+    i=0
+    while (i < 10 and answer == False):
+        print("start count 10sec == " + str(i))
+        i += 1
+        time.sleep(1)
+        global  summary
+        global lock
+        if answer == False:
+            summary = "Game Finish With Draw"
+        if (i == 2):
+            lock = False
+
+
 def udp_start(msg,ip, clientPort,udp_socket):
     '''
     :param msg: udp broadcast msg
@@ -88,11 +105,17 @@ print("ssss")
 
 # server alawys run and looking for players
 while True:
-    (clientSocket, (ip,port)) = tcpsock.accept()
-    teamName = clientSocket.recv(1024).decode().strip('\n')
-    teamNames.append(teamName)
-    runt = run
-    newthread = Thread(target=runt , args=[clientSocket,len(threads)])
+    try:
+        (clientSocket, (ip,port)) = tcpsock.accept()
+        # clientSocket.settimeout(0.5)
+        teamName = clientSocket.recv(1024).decode().strip('\n')
+        teamNames.append(teamName)
+        runt = run
+        newthread = Thread(target=runt , args=[clientSocket,len(threads)])
+    except socket.timeout:
+        print("time out Team not send name")
+        clientSocket.close()
+
     threads.append(newthread)
     if(len(threads)==2):
         qes = (f"Welcome to Quick Math." +'\n'+ "Player 1 : "+teamNames[0] +'\n' + "Player 2 : " + teamNames[1] + '\n' "===" +'\n' "Please answer the following question as fast as you can:" +'\n'+ "How much is 2+2  ?" )
@@ -103,14 +126,7 @@ while True:
         qes = (f"Welcome to Quick Math." +'\n'+ "Player 1 : "+teamNames[0] +'\n' + "Player 2 : " + teamNames[1] + '\n' "===" +'\n' "Please answer the following question as fast as you can:" +'\n'+ "How much is 2+2  ?" )
         i = 0
 #TODO ITS NEED TO BE i= 10, I CHANGED IT TO 3 TO MAKE TEST EASIER
-        while(i<3 and answer == False):
-            print("start count 10sec == "+str(i))
-            i+=1
-            time.sleep(1)
-            if answer == False:
-                summary = "Game Finish With Draw"
-            if(i == 2):
-                lock = False
+        count10()
 
         if(answer == True):
             key = list(clientAns.keys())[0]
@@ -119,7 +135,8 @@ while True:
 
 
         lock = False
-        time.sleep(1)
+        threads[0].join()
+        threads[1].join()
         threads.clear()
         answer = False
 
