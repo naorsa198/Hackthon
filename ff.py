@@ -1,5 +1,8 @@
 import sys
+from collections import OrderedDict
 
-char = sys.stdin.read(1)
+dic = OrderedDict()
+dic['lol'] = 5
+dic['wds'] = 6
 
-print(char)
+print((list(dic.keys()))[0])

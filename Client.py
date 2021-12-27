@@ -28,6 +28,9 @@ if(str(msg[0])== "offer"):
     print(modifiedSenctence.decode())
     char = sys.stdin.read(1)
     tcp_client.send(char.encode())
+# get resuls of game
+    results = tcp_client.recv(1024)
+    print(results.decode())
     tcp_client.close()
 
 
