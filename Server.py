@@ -7,18 +7,6 @@ from collections import OrderedDict
 
 import scapy
 
-
-# class MyThread(Thread):
-#
-#     def __init__(self, ip, clientPort,clientSocket,index):
-#         Thread.__init__(self)
-#         self.ip = ip
-#         self.clientPort = clientPort
-#         self.stop = True
-#         self.clientSocket = clientSocket
-#         self.index = index+1
-#
-
 def run(clientSocket,index):
     '''
     :param clientSocket:  socket connect to player
@@ -114,6 +102,7 @@ while True:
 
         qes = (f"Welcome to Quick Math." +'\n'+ "Player 1 : "+teamNames[0] +'\n' + "Player 2 : " + teamNames[1] + '\n' "===" +'\n' "Please answer the following question as fast as you can:" +'\n'+ "How much is 2+2  ?" )
         i = 0
+#TODO ITS NEED TO BE i= 10, I CHANGED IT TO 3 TO MAKE TEST EASIER
         while(i<3 and answer == False):
             print("start count 10sec == "+str(i))
             i+=1
