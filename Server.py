@@ -7,7 +7,40 @@ from collections import OrderedDict
 
 import scapy
 
-def run(clientSocket,index):
+class player:
+    def __init__(self, teamName):
+        self.teamName = teamName
+        self.answer = ""
+        self.PORT = None  # TCP
+        self.IP = None
+
+    def __eq__(self, other):
+        if not isinstance(other, player):
+            return "other is not an instance of type <player>"
+        elif self is other:
+            return True
+        else:
+            return self.PORT == other.PORT and self.IP == other.IP
+
+class Game:
+    """"""
+    def __init__(self):
+        """initial Game params"""
+        self.lThreads = []
+        self.lTeamNames = []
+        self.summary = ""
+        self.dTeamsAnswers = dict()
+
+# global vars
+summary=""
+threads = []
+teamNames = []
+answer = False
+clientAns = OrderedDict() #todo Redundant overhead, pls use regular dict
+result = 2
+lock = True
+
+def clientThread(clientSocket, index):
     '''
     :param clientSocket:  socket connect to player
     :param index: first or sec player to join game
@@ -16,14 +49,14 @@ def run(clientSocket,index):
     '''
     try:
         while True:
-            print(index)
-            #send the team name to server
+            print(index, end='\n')
+            #send the welcome message + math problem to client
             clientSocket.send(qes.encode())
             #recv answer from client and put it into dictionary [teamname] = answer
-#   TODO HERE HABE BUG ITS NOT RECV
+#   TODO HERE HABE BUG ITS NOT RECVING
             myans = clientSocket.recv(1024)
-            print("falling why  maybe because i try two clients from same pc ? same ip same port????")
             myans = myans.decode()
+            print(f"func 'clientThread': client_ans={myans} => success! recieved char from client over TCP... the method of global vars doesn't work")
             clientAns[index] = myans
             global answer
             answer = True
@@ -39,37 +72,6 @@ def run(clientSocket,index):
         print("IOE Error threade")
     finally:clientSocket.close()
 
-
-
-
-# configur of ip and ports
-hostname = socket.gethostname()
-ip =  socket.gethostbyname(hostname)
-clientPort=13117
-            # create udp socket
-udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp_socket.bind((ip, 0))
-myPort = udp_socket.getsockname()[1]
-            #create tcp socket
-tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-tcpsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-tcpsock.bind((ip,0))
-myPortTcp = tcpsock.getsockname()[1]
-
-# global vars
-
-summary=""
-threads = []
-tcpsock.listen(2)
-print(f'Server started, listening on IP address {ip}')
-msg = "offer,"+str(myPortTcp)
-teamNames = []
-answer = False
-clientAns = OrderedDict()
-result = 2
-lock = True
-
-
 def count10():
     i=0
     while (i < 10 and answer == False):
@@ -84,7 +86,7 @@ def count10():
             lock = False
 
 
-def udp_start(msg,ip, clientPort,udp_socket):
+def udp_start(msg, clientPort,udp_socket):
     '''
     :param msg: udp broadcast msg
     :param ip: my ip
@@ -92,48 +94,73 @@ def udp_start(msg,ip, clientPort,udp_socket):
     :param udp_socket:  my computer udp socket
     '''
    # run main udp thread calling for 2 players stop after get 2 players runing every 1sec and stop after he find 2 players
-    while(len(threads)<2):
-            print("runing")
-            udp_socket.sendto(msg.encode(), (ip, clientPort))
-            time.sleep(1)
+    while(len(threads) < 2):
+            print("sending UDP broadcast every 1sec or until 2 clients join the game", end='\n')
+            # Broadcast to everyone (not to a specific IP)
+            udp_socket.sendto(msg.encode(), ('<broadcast>', clientPort))
+            time.sleep(1) # send every 1 sec
 
-                # start the udp trade
-udtThreadFunction = udp_start
-udtthread = Thread(target=udtThreadFunction, args =[msg,ip,clientPort,udp_socket])
-udtthread.start()
-print("ssss")
 
+
+
+# configure ip and ports
+hostname = socket.gethostname()
+serverIP =  socket.gethostbyname(hostname)
+clientPort=13117
+
+# create udp socket
+udpSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+udpSocket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+udpSocket.bind((serverIP, 0))
+udpPort = udpSocket.getsockname()[1]
+print(f"server UDP socket = {udpSocket.getsockname()}", end='\n')
+
+#create tcp socket
+tcpSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+tcpSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+tcpSock.bind((serverIP, 0))
+tcpPort = tcpSock.getsockname()[1]
+print(f"server TCP socket = {tcpSock.getsockname()}", end='\n')
+msg = "offer,"+str(tcpPort) #todo change this to the correct msg udp format from assignment instructions
+#msg = struct.pack('Ibh', 0xabcddcba, 0x2, myPortTcp)
+
+tcpSock.listen(2)
+
+# start the udp thread
+udpThreadFunction = udp_start
+udpThread = Thread(target=udpThreadFunction, args =[msg, clientPort, udpSocket])
+udpThread.start()
+print("main thread: started UDP thread, server is now broadcasting offers (udp)")
+print(f"Server started, listening on IP address {serverIP}")
 # server alawys run and looking for players
 while True:
     try:
-        (clientSocket, (ip,port)) = tcpsock.accept()
+        (clientSocket, (clientIP, port)) = tcpSock.accept()
+        print(f'(clientSocket={clientSocket}, (clientIp={clientIP},clientPort={port}))')
         # clientSocket.settimeout(0.5)
         teamName = clientSocket.recv(1024).decode().strip('\n')
         teamNames.append(teamName)
-        runt = run
+        runt = clientThread
         newthread = Thread(target=runt , args=[clientSocket,len(threads)])
+        threads.append(newthread)
     except socket.timeout:
         print("time out Team not send name")
         clientSocket.close()
 
-    threads.append(newthread)
     if(len(threads)==2):
+        #todo generate random math problem
         qes = (f"Welcome to Quick Math." +'\n'+ "Player 1 : "+teamNames[0] +'\n' + "Player 2 : " + teamNames[1] + '\n' "===" +'\n' "Please answer the following question as fast as you can:" +'\n'+ "How much is 2+2  ?" )
         threads[0].start()
         threads[1].start()
         print("here")
 
-        qes = (f"Welcome to Quick Math." +'\n'+ "Player 1 : "+teamNames[0] +'\n' + "Player 2 : " + teamNames[1] + '\n' "===" +'\n' "Please answer the following question as fast as you can:" +'\n'+ "How much is 2+2  ?" )
         i = 0
 #TODO ITS NEED TO BE i= 10, I CHANGED IT TO 3 TO MAKE TEST EASIER
         count10()
-
         if(answer == True):
             key = list(clientAns.keys())[0]
             otherTeam = teamNames[1]  if teamNames[0] == key else teamNames[0]
             summary = "Game Over" + '\n' "The corrent answer was 4!" '\n' + "Congratulations to the winner: "+ key if(clientAns[key] == 4) else "Game Over" + '\n' "The corrent answer was 4!" '\n' + "Congratulations to the winner: "+otherTeam
-
-
         lock = False
         threads[0].join()
         threads[1].join()
