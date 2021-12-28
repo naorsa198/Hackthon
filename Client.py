@@ -91,7 +91,7 @@ if(magicCookie == int(0xabcddcba)):
     try:
         while not results:
             results = tcpSock.recv(1024) # server sends game summary
-            print(f"client Naor: looping to get summary msg from server, got: {results}")
+            print(f"client {teamName}: looping to get summary msg from server, got: {results}")
     except ConnectionResetError as err: # if server has runtime exception/network issues the attempts to connect to it throws exception
         print(err)
 

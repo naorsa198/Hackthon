@@ -8,12 +8,13 @@ from collections import OrderedDict
 import scapy
 
 class player:
-    def __init__(self, teamName, index):
+    lPlayers = []
+    def __init__(self, teamName, index, clientIP, clientPORT):
         self.index = index
         self.teamName = teamName
         self.answer = ""
-        self.PORT = None  # TCP
-        self.IP = None
+        self.PORT = clientPORT  # TCP
+        self.IP = clientIP
 
     def __eq__(self, other):
         if not isinstance(other, player):
@@ -71,7 +72,6 @@ def clientThread(clientSocket, index):
             #
             # #else -> other player gave an answer
             #   send gameObj.summary
-
             global answer
             answer = True
             # lock to not read befor server finish to write
@@ -99,7 +99,7 @@ def count10():
             summary = "Game Finish With Draw"
         if (i == 2):
             lock = False
-    #todo if none of the players replied -> send summary here! (10 secs have passed)
+    # send summary to both players
 
 
 def udp_start(msg, clientPort,udp_socket):
@@ -143,7 +143,7 @@ except struct.error as err:
     print(err)
     msg = "2882395322," + str(2) + "," + str(tcpPort)
     msg = msg.encode()
-tcpSock.listen(2)
+tcpSock.listen(2) # 2 is num of UNaccepted connections allowed before server refuses connections
 
 # start the udp thread
 udpThreadFunction = udp_start
@@ -152,15 +152,16 @@ udpThread.start()
 print("main thread: started UDP thread, server is now broadcasting offers (udp)")
 print(f"Server started, listening on IP address {serverIP}")
 # server alawys run and looking for players
+
 while True:
     try:
-        (clientSocket, (clientIP, port)) = tcpSock.accept()
+        (clientSocket, (clientIP, clientPORT)) = tcpSock.accept()
         # clientSocket.settimeout(0.5)
-        teamName = clientSocket.recv(1024).decode().strip('\n')
-        teamNames.append(teamName)
-
+        playerName = clientSocket.recv(1024).decode().strip('\n')
+        teamNames.append(playerName) # todo find & replace usages with player.lPlayers[idx].name
         playerIdx = len(threads) # get len before appending new thread
-        print(f'\nClient {teamNames[playerIdx]}: clientIp={clientIP}, clientPort={port}')
+        player.lPlayers.append(player(playerName, playerIdx, clientIP, clientPORT))
+        print(f'\nClient {player.lPlayers[playerIdx].teamName}: clientIp={clientIP}, clientPort={clientPORT}')
         runt = clientThread
         newthread = Thread(target=runt , args=[clientSocket,playerIdx])
         threads.append(newthread)
