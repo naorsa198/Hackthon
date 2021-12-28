@@ -96,11 +96,11 @@ if(magicCookie == int(0xabcddcba)):
         print(err)
 
     # game over!
-    if threadGetAnswer.is_alive(): # stop getting player keyboard input
-        try:
-            #threadGetAnswer._stop.set()
-            threadGetAnswer.join()
-        except Exception as e:
+    try:
+        if threadGetAnswer.is_alive(): # stop getting player keyboard input
+                #threadGetAnswer._stop.set()
+                threadGetAnswer.join()
+    except Exception as e:
             print(e)
     print(results.decode())
     tcpSock.close()
