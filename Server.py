@@ -8,7 +8,8 @@ from collections import OrderedDict
 import scapy
 
 class player:
-    def __init__(self, teamName):
+    def __init__(self, teamName, index):
+        self.index = index
         self.teamName = teamName
         self.answer = ""
         self.PORT = None  # TCP
@@ -27,9 +28,12 @@ class Game:
     def __init__(self):
         """initial Game params"""
         self.lThreads = []
-        self.lTeamNames = []
+        self.lTeamNames = [] # may be redundant...
         self.summary = ""
         self.dTeamsAnswers = dict()
+        self.mathProblem = ""
+        self.correctAnswer = ""
+        self.playerAnswer = "" # once a char is received from 1 player we can determine the game result
 
 # global vars
 summary=""
@@ -37,7 +41,6 @@ threads = []
 teamNames = []
 answer = False
 clientAns = OrderedDict() #todo Redundant overhead, pls use regular dict
-result = 2
 lock = True
 
 def clientThread(clientSocket, index):
@@ -49,28 +52,40 @@ def clientThread(clientSocket, index):
     '''
     try:
         while True:
-            print(index, end='\n')
+            print(f"Hi, I am client number {index}\n", end="\n")
             #send the welcome message + math problem to client
             clientSocket.send(qes.encode())
             #recv answer from client and put it into dictionary [teamname] = answer
-#   TODO HERE HABE BUG ITS NOT RECVING
-            myans = clientSocket.recv(1024)
+            myans = clientSocket.recv(1024) #TODO Make this Non-Blocking otherwise the other client is stuck here and doesn't get the summary
             myans = myans.decode()
-            print(f"func 'clientThread': client_ans={myans} => success! recieved char from client over TCP... the method of global vars doesn't work")
+            print(f"func 'clientThread': client_{index}_ans={myans} => success! recieved char from client over TCP... the method of global vars doesn't work")
             clientAns[index] = myans
+            # todo If (gameObj.playerAnswer) then immediately send summary to BOTH players
+            # myans = None
+            # while gameObj.playerAnswer == None:
+            #   myans = clientSocket.recv(1024)
+            #   clientSocket.settimeout(2)
+            #   if myans != None:
+            #       myans = myans.decode()
+            #       gameObj.playerAnswer = myans #todo should put mutex on the resource when writing
+            #
+            # #else -> other player gave an answer
+            #   send gameObj.summary
+
             global answer
             answer = True
-            # look to not read befor server finish to write
+            # lock to not read befor server finish to write
             global lock
-            while lock:
+            while lock: # released after 2 seconds
                 pass
             print("after lock")
             #send to client the summary of the game
             clientSocket.send(summary.encode())
             clientSocket.close()
-    except IOError:
-        print("IOE Error threade")
-    finally:clientSocket.close()
+    except IOError as msg:
+        print("Client thread: IOError.",msg)
+    finally:
+        clientSocket.close()
 
 def count10():
     i=0
@@ -84,6 +99,7 @@ def count10():
             summary = "Game Finish With Draw"
         if (i == 2):
             lock = False
+    #todo if none of the players replied -> send summary here! (10 secs have passed)
 
 
 def udp_start(msg, clientPort,udp_socket):
@@ -97,7 +113,7 @@ def udp_start(msg, clientPort,udp_socket):
     while(len(threads) < 2):
             print("sending UDP broadcast every 1sec or until 2 clients join the game", end='\n')
             # Broadcast to everyone (not to a specific IP)
-            udp_socket.sendto(msg.encode(), ('<broadcast>', clientPort))
+            udp_socket.sendto(msg, ('<broadcast>', clientPort))
             time.sleep(1) # send every 1 sec
 
 
@@ -121,9 +137,12 @@ tcpSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 tcpSock.bind((serverIP, 0))
 tcpPort = tcpSock.getsockname()[1]
 print(f"server TCP socket = {tcpSock.getsockname()}", end='\n')
-msg = "offer,"+str(tcpPort) #todo change this to the correct msg udp format from assignment instructions
-#msg = struct.pack('Ibh', 0xabcddcba, 0x2, myPortTcp)
-
+try:
+    msg = struct.pack('IbH', 0xabcddcba, 0x2, tcpPort)
+except struct.error as err:
+    print(err)
+    msg = "2882395322," + str(2) + "," + str(tcpPort)
+    msg = msg.encode()
 tcpSock.listen(2)
 
 # start the udp thread
@@ -136,12 +155,14 @@ print(f"Server started, listening on IP address {serverIP}")
 while True:
     try:
         (clientSocket, (clientIP, port)) = tcpSock.accept()
-        print(f'(clientSocket={clientSocket}, (clientIp={clientIP},clientPort={port}))')
         # clientSocket.settimeout(0.5)
         teamName = clientSocket.recv(1024).decode().strip('\n')
         teamNames.append(teamName)
+
+        playerIdx = len(threads) # get len before appending new thread
+        print(f'\nClient {teamNames[playerIdx]}: clientIp={clientIP}, clientPort={port}')
         runt = clientThread
-        newthread = Thread(target=runt , args=[clientSocket,len(threads)])
+        newthread = Thread(target=runt , args=[clientSocket,playerIdx])
         threads.append(newthread)
     except socket.timeout:
         print("time out Team not send name")
@@ -152,7 +173,7 @@ while True:
         qes = (f"Welcome to Quick Math." +'\n'+ "Player 1 : "+teamNames[0] +'\n' + "Player 2 : " + teamNames[1] + '\n' "===" +'\n' "Please answer the following question as fast as you can:" +'\n'+ "How much is 2+2  ?" )
         threads[0].start()
         threads[1].start()
-        print("here")
+        print("\n Two player threads started")
 
         i = 0
 #TODO ITS NEED TO BE i= 10, I CHANGED IT TO 3 TO MAKE TEST EASIER
