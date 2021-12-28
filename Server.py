@@ -3,10 +3,18 @@ import time
 import struct
 import random
 from threading import *
-from collections import OrderedDict
-
-
+import fcntl
 import scapy
+
+#  serverIP = get_if_addr(interface)
+def getIpAddress(ifname): # may not work on Windows since we use "fileno()"
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+    )[20:24])
+
 
 class player:
     lPlayers = []
@@ -217,6 +225,7 @@ while True:
             pass
 
     if len(game.lThreads) == 2:
+        print("got here with only 1 thread in liat... how?")
         game.generateMathProblem()
         print(f"math problem = {game.mathProblem}")
         game.lThreads[0].start()
