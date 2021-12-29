@@ -143,7 +143,7 @@ How much is {op1} + {op2}?'''.format(op1=x, op2=y, p1=self.lPlayers[0].teamName,
     def countdown10(self):
         i = 0
         while i < 10 and self.playerAnswer is None:
-            print("start count 10sec == " + str(i))
+            # print("start count 10sec == " + str(i))
             i += 1
             time.sleep(1)
         self.gameOver = True
@@ -176,8 +176,8 @@ def udp_start(msg, clientPort,udp_socket):
 
 
 # configure ip and ports on REMOTE
-interface="eth1" # test_net = eth2
-serverIP = get_if_addr(interface)
+#interface="eth1" # test_net = eth2
+#serverIP = get_if_addr(interface)
 
 # configure ip and ports on LOCAL
 hostname = socket.gethostname()
@@ -194,20 +194,19 @@ udpPort = udpSocket.getsockname()[1]
 #create tcp socket
 tcpSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 tcpSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-tcpSock.bind((serverIP, 0))
+tcpSock.bind((serverIP, 2005))
 tcpPort = tcpSock.getsockname()[1]
 # print(f"server TCP socket = {tcpSock.getsockname()}", end='\n')
 try:
      msg = struct.pack('IbH', 0xabcddcba, 0x2, tcpPort)
-     print(msg)
- except struct.error as err:
-# msg = "2882395322," + str(2) + "," + str(tcpPort)
-# msg = msg.encode()
- pass
+except struct.error as err:
+    msg = "2882395322," + str(2) + "," + str(tcpPort)
+    msg = msg.encode()
+
 tcpSock.listen(5) # 5 is num of UNaccepted connections allowed before server refuses connections
 
 # start the udp thread
-udpThread = Thread(target=udp_start, args =[None, clientPort, udpSocket])
+udpThread = Thread(target=udp_start, args =[msg, clientPort, udpSocket])
 udpThread.start()
 print(f"\nServer started, listening on IP address {serverIP}")
 
