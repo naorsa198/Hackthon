@@ -176,8 +176,8 @@ def udp_start(msg, clientPort,udp_socket):
 
 
 # configure ip and ports on REMOTE
-# interface="eth1" # test_net = eth2
-# serverIP = get_if_addr(interface)
+interface="eth1" # test_net = eth2
+serverIP = get_if_addr(interface)
 
 # configure ip and ports on LOCAL
 hostname = socket.gethostname()

@@ -41,12 +41,12 @@ while True:
     clientPort = 13117
 
     # configure ip and ports on REMOTE
-    # interface="eth1"
-    # clientIP = get_if_addr(interface)
+    interface="eth1"
+    clientIP = get_if_addr(interface)
 
     # configure ip and ports on LOCAL
-    hostname = socket.gethostname()
-    clientIP = socket.gethostbyname(hostname)
+    # hostname = socket.gethostname()
+    # clientIP = socket.gethostbyname(hostname)
 
     address = (clientIP, clientPort)
     # print(f"clientIP={clientIP} clientPort={clientPort}")

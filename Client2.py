@@ -41,12 +41,12 @@ while True:
     clientPort = 13117
 
 # configure ip and ports on REMOTE
-    # interface="eth1"
-    # clientIP = get_if_addr(interface)
+    interface="eth1"
+    clientIP = get_if_addr(interface)
 
 # configure ip and ports on LOCAL
-    hostname = socket.gethostname()
-    clientIP = socket.gethostbyname(hostname)
+#     hostname = socket.gethostname()
+#     clientIP = socket.gethostbyname(hostname)
 
     address = (clientIP, clientPort)
     # print(f"clientIP={clientIP} clientPort={clientPort}")
@@ -67,10 +67,10 @@ while True:
         magicCookie = decodedMsg[0]
         ServerTcpPort = decodedMsg[2]
     except Exception as e:
-        pass
         msg = msg.decode().split(',')
         magicCookie = int(msg[0])
         ServerTcpPort = int(msg[2])
+        pass
 
 
     if(magicCookie == int(0xabcddcba)):
