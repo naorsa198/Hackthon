@@ -3,17 +3,9 @@ import time
 import struct
 import random
 from threading import *
-import fcntl
-import scapy
-
-#  serverIP = get_if_addr(interface)
-def getIpAddress(ifname): # may not work on Windows since we use "fileno()"
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(),
-        0x8915,  # SIOCGIFADDR
-        struct.pack('256s', ifname[:15])
-    )[20:24])
+from collections import OrderedDict
+from scapy.all import *
+import traceback
 
 
 class player:
@@ -51,7 +43,7 @@ class Game:
         self.winner = None
         self.playerAnswrCounter = 0
         self.lock = Lock()
-
+        self.gameOver = False
 
     def incrementCounter(self):
         self.playerAnswrCounter += 1
@@ -59,37 +51,38 @@ class Game:
     def generateMathProblem(self):
         x = random.randint(1, 4)
         y = random.randint(1, 4)
-        self.mathProblem = '''Welcome to Quick Maths.
-                              Player 1: Instinct
-                              Player 2: Rocket
-                              ==
-                              Please answer the following question as fast as you can:
-                              How much is {op1} + {op2}?'''.format(op1=x, op2=y)
+        self.mathProblem = '''Welcome to Quick Maths.\nPlayer 1: Instinct\nPlayer 2: Rocket\n==
+Please answer the following question as fast as you can:
+How much is {op1} + {op2}?'''.format(op1=x, op2=y)
         self.correctAnswer = x + y
+        return self.mathProblem
 
 
     def setSummary(self, i):
         # when some player responded in under than 10 secs
-        ansRcvd = '''Game over!
-        The correct answer was {correctAns}!
-                    
-        Congratulations to the WINNER: {winner}'''.format(winner=self.winner, correctAns=self.correctAnswer)
+        #if isinstance(self.winner, player):
+        try:
+            ansRcvd = '''Game over!
+    The correct answer was {correctAns}!
+                        
+    Congratulations to the WINNER: {winner}'''.format(winner=self.winner.teamName, correctAns=self.correctAnswer)
 
-        # when 10 secs passes and none of the players responded
-        noAnsRcvd = '''Game over!
-        The correct answer was {correctAns}!
-        
-        It seems you were both equally slow ;)              
-        game result: DRAW                       
-        '''.format(correctAns=self.correctAnswer)
+            # when 10 secs passes and none of the players responded
+            noAnsRcvd = '''Game over!
+            The correct answer was {correctAns}!
+            
+            It seems you were both equally slow ;)              
+            game result: DRAW                       
+            '''.format(correctAns=self.correctAnswer)
 
-        if i == 10:
-            self.summary = noAnsRcvd
-        elif self.playerAnswer and self.winner:
-            self.summary = ansRcvd
-        else:
-            self.summary = noAnsRcvd
-
+            if i == 10:
+                self.summary = noAnsRcvd
+            elif self.playerAnswer and self.winner:
+                self.summary = ansRcvd
+            else:
+                self.summary = noAnsRcvd
+        except Exception as err:
+            print(err)
 
     def setWinner(self, answer, AnsweringPlayer):
         try:
@@ -107,21 +100,34 @@ class Game:
             print(f"Hi, I am client {player.teamName}\n")
 
             # send the welcome message + math problem to player
-            player.clientSocket.send(self.mathProblem.encode())
+            try: #  AttributeError: 'NoneType' object has no attribute 'encode'
+                player.clientSocket.send(self.mathProblem.encode())
+            except Exception as err:
+                print(err)
+                while self.mathProblem is None:
+                    time.sleep(1)
+                try:
+                    player.clientSocket.send(self.mathProblem.encode())
+                except Exception as err:
+                    pass
 
             # recv answer from one of the players
             myans = None
             player.clientSocket.settimeout(2)
             print(f"\nplayer {player.teamName}: game.playerAnswer = {game.playerAnswer}")
-            while game.playerAnswer is None: #if someone already answered, server stops receiving (skip loop)
-                myans = player.clientSocket.recv(1024)
+            j=0
+            while game.playerAnswer is None and not self.gameOver: #if someone already answered, server stops receiving (skip loop)
+                print(f"play {player.teamName}: loop number {j}")
+                j+=1
+                try:
+                    myans = player.clientSocket.recv(1024)
+                except socket.timeout:
+                    continue
                 if myans and game.playerAnswer is None and not game.lock.locked():
                     myans = myans.decode()
                     player.answer = myans
-                    print(f"func 'clientThread': client_{index}_ans={myans} => success! recieved char from client over TCP... the method of global vars doesn't work")
+                    print(f"func 'clientThread': client_{player.teamName}_ans={myans} => success! recieved char from client over TCP... the method of global vars doesn't work")
                     # todo Test this mutex shenanigans, change to counter method if doesn't work
-                    #if game.lock.locked(): #someone got here before me, so I just need summary now
-                    #    break
                     try:
                         game.lock.acquire(timeout=2) # blocking until getting the lock or for up to 2 seconds
                         game.playerAnswer = myans
@@ -134,7 +140,11 @@ class Game:
                         except Exception as err:
                             print(err)
         except IOError as msg:
-            print("Client thread: IOError.",msg)
+            print("Client thread: Error: ",msg)
+            traceback.print_exc()
+        except Exception:
+            traceback.print_exc()
+
 
 
     def countdown10(self):
@@ -143,10 +153,8 @@ class Game:
             print("start count 10sec == " + str(i))
             i += 1
             time.sleep(1)
+        self.gameOver = True
         return i
-
-
-
 
 
 def udp_start(msg, clientPort,udp_socket):
@@ -158,15 +166,19 @@ def udp_start(msg, clientPort,udp_socket):
     '''
     global nThreadsForUDP
     nThreadsForUDP = 0
-   # run main udp thread calling for 2 players stop after get 2 players runing every 1sec and stop after he find 2 players
+    # run main udp thread calling for 2 players stop after get 2 players runing every 1sec and stop after he find 2 players
     while nThreadsForUDP < 2:
-            print("sending UDP broadcast every 1sec or until 2 clients join the game", end='\n')
-            # Broadcast to everyone (not to a specific IP)
-            udp_socket.sendto(msg, ('<broadcast>', clientPort))
-            time.sleep(1) # send every 1 sec
+        print("sending UDP broadcast every 1sec or until 2 clients join the game", end='\n')
+        # Broadcast to everyone (not to a specific IP)
+        udp_socket.sendto(msg, ('<broadcast>', clientPort))
+        time.sleep(1) # send every 1 sec
 
 
-# configure ip and ports
+# configure ip and ports on REMOTE
+# interface="eth1" # test_net = eth2
+# serverIP = get_if_addr(interface)
+
+# configure ip and ports on LOCAL
 hostname = socket.gethostname()
 serverIP =  socket.gethostbyname(hostname)
 clientPort=13117
@@ -193,8 +205,8 @@ except struct.error as err:
 tcpSock.listen(5) # 2 is num of UNaccepted connections allowed before server refuses connections
 
 # start the udp thread
-udpThreadFunction = udp_start
-udpThread = Thread(target=udpThreadFunction, args =[msg, clientPort, udpSocket])
+#todo Move this to the main service loop - the server sends offers again once game is over
+udpThread = Thread(target=udp_start, args =[msg, clientPort, udpSocket])
 udpThread.start()
 print("\nmain thread: started UDP thread, server is now broadcasting offers (udp)")
 print(f"\nServer started, listening on IP address {serverIP}")
@@ -202,19 +214,19 @@ print(f"\nServer started, listening on IP address {serverIP}")
 # server alawys run and looking for players
 game = None
 while True:
-    if not game:
+    if game is None:
         game = Game()
 
     try:
         (clientSocket, (clientIP, clientPORT)) = tcpSock.accept()
         playerName = clientSocket.recv(1024).decode().strip('\n')
-
+        print("line after clientSocket.recv reached")
         playerIdx = len(game.lThreads) # get len before appending new thread
 
         game.lPlayers.append(player(playerName, playerIdx, clientIP, clientPORT, clientSocket))
         print(f'\nClient {game.lPlayers[playerIdx].teamName}: clientIp={clientIP}, clientPort={clientPORT}')
 
-        newthread = Thread(target=game.play(playerIdx) , args=[playerIdx])
+        newthread = Thread(target=game.play , args=[playerIdx])
         game.lThreads.append(newthread)
         nThreadsForUDP = len(game.lThreads)
     except socket.timeout:
@@ -225,13 +237,13 @@ while True:
             pass
 
     if len(game.lThreads) == 2:
-        print("got here with only 1 thread in liat... how?")
         game.generateMathProblem()
         print(f"math problem = {game.mathProblem}")
         game.lThreads[0].start()
         game.lThreads[1].start()
         print("\n Two player threads started")
         timeElapsed = game.countdown10() # sends summary to both players, does NOT close the tcp connections
+
         game.lThreads[0].join()
         game.lThreads[1].join()
 
@@ -240,7 +252,10 @@ while True:
         encodedSummary = game.summary.encode()
         for p in game.lPlayers:
             p.clientSocket.send(encodedSummary)
+            print(f"sent summary to client {p.teamName}")
+            time.sleep(0.5)
             p.closeTcpConn()
+        game = None
 
 
 

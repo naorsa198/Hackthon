@@ -4,6 +4,7 @@ import time
 import sys
 import select
 from threading import Thread
+from scapy.all import *
 
 
 def flush_input():
@@ -12,7 +13,7 @@ def flush_input():
         while msvcrt.kbhit():
             msvcrt.getch()
     except ImportError:
-        import sys, termios    #for linux/unix
+        import termios    #for linux/unix
         termios.tcflush(sys.stdin, termios.TCIOFLUSH)
 
 def getPlayerAnswer():
@@ -21,7 +22,7 @@ def getPlayerAnswer():
     char = None
     try:
         char = sys.stdin.read(1).encode()
-        print(f"getAnswer thread: the player's input was {char} - is that correct?")
+        print(f"getAnswer thread: the player's input was {char}")
     except Exception as err:
         print(err)
     if char != None:
@@ -34,18 +35,26 @@ def getPlayerAnswer():
 
 
 udpSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-udpSock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-#udp_socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEPORT,1)
+#udpSock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+#udpSock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEPORT,1)
 
 # try to bind UDP sock to port 13117
 clientPort = 13117
+
+# configure ip and ports on REMOTE
+# interface="eth1"
+# clientIP = get_if_addr(interface)
+
+# configure ip and ports on LOCAL
 hostname = socket.gethostname()
-clientIP =  socket.gethostbyname(hostname)
+clientIP = socket.gethostbyname(hostname)
+
 address = (clientIP, clientPort)
+print(f"clientIP={clientIP} clientPort={clientPort}")
 try:
     udpSock.bind(address)
 except socket.error as msg:
-    print("\nBind failed. Error code: " + str(msg[0]) + '\nMessage ' + msg[1])
+    print("\nBind failed. Error code: ", msg)
 
 teamName = "Zrubavel"
 
@@ -59,7 +68,7 @@ try:
     decodedMsg = struct.unpack('IbH', msg)
     print(f"\nthe udp msg from server is: {decodedMsg}")
     magicCookie = decodedMsg[0]
-    ServerTcpPort = decodedMsg[2] #todo should be the 3rd element, i.e. msg[2]
+    ServerTcpPort = decodedMsg[2]
     print(f"\nmagicCookie = {magicCookie}")
     print(f"\nServer TCP Port = {ServerTcpPort}")
 except Exception as e:
@@ -90,18 +99,19 @@ if(magicCookie == int(0xabcddcba)):
     results = None
     try:
         while not results:
+            print(f"Stuck here??")
             results = tcpSock.recv(1024) # server sends game summary
-            print(f"client {teamName}: looping to get summary msg from server, got: {results}")
+            print(f"results = {results}  # should be summary after game over")
     except ConnectionResetError as err: # if server has runtime exception/network issues the attempts to connect to it throws exception
         print(err)
 
     # game over!
-    if threadGetAnswer.is_alive(): # stop getting player keyboard input
-        try:
-            #threadGetAnswer._stop.set()
-            threadGetAnswer.join()
-        except Exception as e:
-            print(e)
+    try:
+        if threadGetAnswer.is_alive(): # stop getting player keyboard input
+            threadGetAnswer._stop.set()
+            #threadGetAnswer.join()
+    except Exception as e:
+        print(e)
     print(results.decode())
     tcpSock.close()
 
