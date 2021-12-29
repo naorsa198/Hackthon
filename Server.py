@@ -154,6 +154,15 @@ How much is {op1} + {op2}?'''.format(op1=x, op2=y, p1=self.lPlayers[0].teamName,
             i += 1
             time.sleep(1)
         self.gameOver = True
+
+        noAnsRcvd = '''Game over!
+            The correct answer was {correctAns}!
+            
+            It seems you were both equally slow ;)              
+            game result: DRAW                       
+            '''.format(correctAns=self.correctAnswer)
+        if i == 10:
+            self.summary = noAnsRcvd
         return i
 
 
