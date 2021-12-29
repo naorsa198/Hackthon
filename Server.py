@@ -51,9 +51,9 @@ class Game:
     def generateMathProblem(self):
         x = random.randint(1, 4)
         y = random.randint(1, 4)
-        self.mathProblem = '''Welcome to Quick Maths.\nPlayer 1: Instinct\nPlayer 2: Rocket\n==
+        self.mathProblem = '''Welcome to Quick Maths.\nPlayer 1: {p1}\nPlayer 2: {p2}}\n==
 Please answer the following question as fast as you can:
-How much is {op1} + {op2}?'''.format(op1=x, op2=y)
+How much is {op1} + {op2}?'''.format(op1=x, op2=y, p1=self.lPlayers[0].teamName, p2=self.lPlayers[1].teamName)
         self.correctAnswer = x + y
         return self.mathProblem
 
@@ -256,6 +256,9 @@ while True:
             time.sleep(0.5)
             p.closeTcpConn()
         game = None
+        udpThread = Thread(target=udp_start, args =[msg, clientPort, udpSocket])
+        udpThread.start()
+        print("Game over, sending out offer requests...")
 
 
 
