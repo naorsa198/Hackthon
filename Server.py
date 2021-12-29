@@ -166,6 +166,7 @@ def udp_start(msg, clientPort,udp_socket):
     :param clientPort: client port 13117
     :param udp_socket:  my computer udp socket
     '''
+    msg = bytes("0xabcddcba", 'utf-8')
     global nThreadsForUDP
     nThreadsForUDP = 0
     # run main udp thread calling for 2 players stop after get 2 players runing every 1sec and stop after he find 2 players
@@ -197,15 +198,17 @@ tcpSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 tcpSock.bind((serverIP, 0))
 tcpPort = tcpSock.getsockname()[1]
 # print(f"server TCP socket = {tcpSock.getsockname()}", end='\n')
-try:
-    msg = struct.pack('IbH', 0xabcddcba, 0x2, tcpPort)
-except struct.error as err:
-    msg = "2882395322," + str(2) + "," + str(tcpPort)
-    msg = msg.encode()
+# try:
+#     msg = struct.pack('IbH', 0xabcddcba, 0x2, tcpPort)
+#     print(msg)
+# except struct.error as err:
+# msg = "2882395322," + str(2) + "," + str(tcpPort)
+# msg = msg.encode()
+# pass
 tcpSock.listen(5) # 5 is num of UNaccepted connections allowed before server refuses connections
 
 # start the udp thread
-udpThread = Thread(target=udp_start, args =[msg, clientPort, udpSocket])
+udpThread = Thread(target=udp_start, args =[None, clientPort, udpSocket])
 udpThread.start()
 print(f"\nServer started, listening on IP address {serverIP}")
 

@@ -57,58 +57,58 @@ while True:
 
     teamName = "Zrubavel"
     print('\nClient started, listening for offer requests...')
-    msg, serverAddr = udpSock.recvfrom(1024)
+    msg, serverAddr = udpSock.recvfrom(8)
     # print(f"\nserverAddr={serverAddr}") # (ip, port)
     udpSock.close()
 
+    # try:
+    #     # decode server's message + check validity
+    #     decodedMsg = struct.unpack('IbH', msg)
+    #     magicCookie = decodedMsg[0]
+    #     ServerTcpPort = decodedMsg[2]
+    # except Exception as e:
+    #     pass
+    # msg = msg.decode().split(',')
+    # magicCookie = int(msg[0])
+    # ServerTcpPort = int(msg[2])
+
+
+    #if(magicCookie == int(0xabcddcba)):
+    tcpSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        # decode server's message + check validity
-        decodedMsg = struct.unpack('IbH', msg)
-        magicCookie = decodedMsg[0]
-        ServerTcpPort = decodedMsg[2]
+        #tcpSock.setblocking(False)
+        print(f"\nReceived offer from {serverAddr[0]},attempting to connect...")
+        tcpSock.connect((serverAddr[0], ServerTcpPort))
+        tcpSock.send(teamName.encode())
+
+        mathProblem = tcpSock.recv(1024)
+        print(mathProblem.decode())
+
+        # get 1 char from player
+        threadGetAnswer = Thread(target=getPlayerAnswer)
+        threadGetAnswer.start()
+    except ConnectionResetError as e:
+        pass
+    except Exception as err:
+        pass
+
+    # check the stream to see if server sent the game summary (game over)
+    results = None
+    try:
+        results = tcpSock.recv(1024) # server sends game summary
+    except ConnectionResetError as err: # if server has runtime exception/network issues the attempts to connect to it throws exception
+        pass
     except Exception as e:
         pass
-        msg = msg.decode().split(',')
-        magicCookie = int(msg[0])
-        ServerTcpPort = int(msg[2])
 
-
-    if(magicCookie == int(0xabcddcba)):
-        tcpSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            #tcpSock.setblocking(False)
-            print(f"\nReceived offer from {serverAddr[0]},attempting to connect...")
-            tcpSock.connect((serverAddr[0], ServerTcpPort))
-            tcpSock.send(teamName.encode())
-
-            mathProblem = tcpSock.recv(1024)
-            print(mathProblem.decode())
-
-            # get 1 char from player
-            threadGetAnswer = Thread(target=getPlayerAnswer)
-            threadGetAnswer.start()
-        except ConnectionResetError as e:
-            pass
-        except Exception as err:
-            pass
-
-        # check the stream to see if server sent the game summary (game over)
-        results = None
-        try:
-            results = tcpSock.recv(1024) # server sends game summary
-        except ConnectionResetError as err: # if server has runtime exception/network issues the attempts to connect to it throws exception
-            pass
-        except Exception as e:
-            pass
-
-        # game over!
-        try:
-            if threadGetAnswer.is_alive(): # stop getting player keyboard input
-                threadGetAnswer._stop.set()
-                #threadGetAnswer.join()
-        except Exception as e:
-            pass
-        print(results.decode())
-        tcpSock.close()
-        print("Server disconnected, listening for offer requests...")
+    # game over!
+    try:
+        if threadGetAnswer.is_alive(): # stop getting player keyboard input
+            threadGetAnswer._stop.set()
+            #threadGetAnswer.join()
+    except Exception as e:
+        pass
+    print(results.decode())
+    tcpSock.close()
+    print("Server disconnected, listening for offer requests...")
 
